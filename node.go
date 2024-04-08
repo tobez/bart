@@ -70,20 +70,25 @@ func (p *prefixCBTree[V]) rank(treeIdx uint) int {
 // insert adds the route addr/prefixLen, with value val.
 // Just an adapter for insertIdx.
 func (p *prefixCBTree[V]) insert(addr uint, prefixLen int, val V) {
-	p.insertIdx(prefixToBaseIndex(addr, prefixLen), val)
+	vp, _ := p.getOrInsert(addr, prefixLen)
+	*vp = val
+}
+
+func (p *prefixCBTree[V]) getOrInsert(addr uint, prefixLen int) (*V, bool) {
+	return p.getOrInsertIdx(prefixToBaseIndex(addr, prefixLen))
 }
 
 // insertIdx adds the route for baseIdx, with value val.
-func (p *prefixCBTree[V]) insertIdx(baseIdx uint, val V) {
-	// prefix exists, overwrite val
+func (p *prefixCBTree[V]) getOrInsertIdx(baseIdx uint) (*V, bool) {
+	// prefix exists
 	if p.indexes.Test(baseIdx) {
-		p.values[p.rank(baseIdx)] = val
-		return
+		return &p.values[p.rank(baseIdx)], true
 	}
 
-	// new, insert into bitset and slice
+	// new, insert a zero value into bitset and slice
 	p.indexes.Set(baseIdx)
-	p.values = slices.Insert(p.values, p.rank(baseIdx), val)
+	p.values = slices.Insert(p.values, p.rank(baseIdx), *new(V))
+	return &p.values[p.rank(baseIdx)], false
 }
 
 // delete removes the route addr/prefixLen. Reports whether the
@@ -448,7 +453,8 @@ func (n *node[V]) unionRec(o *node[V]) {
 		}
 		oVal := o.prefixes.getVal(oIdx)
 		// insert/overwrite prefix/value from oNode to nNode
-		n.prefixes.insertIdx(oIdx, oVal)
+		vp, _ := n.prefixes.getOrInsertIdx(oIdx)
+		*vp = oVal
 		oIdx++
 	}
 

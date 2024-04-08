@@ -37,9 +37,21 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return t.rootV6
 }
 
+// GetOrInsert
+// Get      Exact prefix match
+// Find     Longest prefix match
+// Lookup   Like Find but for IP
+// GetAll   Array of all matching prefixes
+// Insert
+
 // Insert adds pfx to the tree, with value val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
+	vp, _ := t.GetOrInsert(pfx)
+	*vp = val
+}
+
+func (t *Table[V]) GetOrInsert(pfx netip.Prefix) (*V, bool) {
 	t.init()
 
 	// always normalize the prefix
@@ -55,8 +67,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 	// insert default route, easy peasy
 	if bits == 0 {
-		n.prefixes.insert(0, 0, val)
-		return
+		return n.prefixes.getOrInsert(0, 0)
 	}
 
 	// the ip is chunked in bytes, the multibit stride is 8
@@ -78,8 +89,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		// 172.16.19.12/32 -> depth 3, addr byte  12, bits 8, (32-3*8 = 8)
 		//
 		if bits <= stride {
-			n.prefixes.insert(addr, bits, val)
-			return
+			return n.prefixes.getOrInsert(addr, bits)
 		}
 
 		// descend down to next child level
